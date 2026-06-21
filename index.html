@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Project Management Form | JsonPowerDB</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <div class="container">
+    <h1>Project Management Form</h1>
+    <p class="subtitle">COLLEGE-DB &rarr; PROJECT-TABLE (powered by JsonPowerDB)</p>
+
+    <form id="projectForm" autocomplete="off">
+
+      <div class="form-group">
+        <label for="projectId">Project ID <span class="key-tag">Primary Key</span></label>
+        <input type="text" id="projectId" name="projectId" placeholder="e.g. P101" />
+      </div>
+
+      <div class="form-group">
+        <label for="projectName">Project Name</label>
+        <input type="text" id="projectName" name="projectName" placeholder="e.g. Library Automation System" disabled />
+      </div>
+
+      <div class="form-group">
+        <label for="assignedTo">Assigned To</label>
+        <input type="text" id="assignedTo" name="assignedTo" placeholder="e.g. Prajakta Sharma" disabled />
+      </div>
+
+      <div class="form-group">
+        <label for="assignmentDate">Assignment Date</label>
+        <input type="date" id="assignmentDate" name="assignmentDate" disabled />
+      </div>
+
+      <div class="form-group">
+        <label for="deadline">Deadline</label>
+        <input type="date" id="deadline" name="deadline" disabled />
+      </div>
+
+      <div class="status-message" id="statusMessage"></div>
+
+      <div class="button-row">
+        <button type="button" id="saveBtn" disabled>Save</button>
+        <button type="button" id="updateBtn" disabled>Update</button>
+        <button type="button" id="resetBtn" disabled>Reset</button>
+      </div>
+
+    </form>
+  </div>
+
+  <script src="js/jpdb-config.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
