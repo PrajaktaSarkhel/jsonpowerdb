@@ -5,3 +5,6 @@ Thumbs.db
 # Editor files
 .vscode/
 *.log
+
+# JPDB credentials - never commit your real token
+js/jpdb-config.js
