@@ -81,12 +81,12 @@ This form lets a user create, view, and update **Project** records stored in the
 
 ```
 project-management-jpdb/
-├── index.html          # Main form page
-├── style.css           # Styling
+├── index.html               # Main form page
+├── style.css                # Styling
 ├── js/
-│   ├── jpdb-config.js  # Your JPDB token, URL, DB & relation names
-│   ├── jpdb-setup.js   # Ensures DB/relation exist (via /api/irl)
-│   └── app.js           # Core form logic + JPDB API calls
+│   ├── jpdb-config.example.js  # Template - copy this to jpdb-config.js
+│   ├── jpdb-config.js          # Your real token (gitignored, not on GitHub)
+│   └── app.js                   # Core form logic + JPDB API calls
 └── README.md
 ```
 
@@ -101,15 +101,16 @@ project-management-jpdb/
    From your dashboard, copy your **Connection Token** and your **API Base URL**.
 
 3. **Configure the project**
-   Open `js/jpdb-config.js` and replace the placeholder values:
+   Copy `js/jpdb-config.example.js` to a new file named `js/jpdb-config.js`, then open it and replace the placeholder token:
    ```js
    const JPDB_CONFIG = {
-     BASE_URL: "http://your-instance-url:port",
+     BASE_URL: "http://api.login2explore.com:5577",
      TOKEN: "your-token-here",
      DB_NAME: "COLLEGE-DB",
      REL_NAME: "PROJECT-TABLE"
    };
    ```
+   > `js/jpdb-config.js` is listed in `.gitignore` and is never pushed to GitHub - your real token stays local.
 
 4. **Run it**
    Open `index.html` in any modern browser (double-click it, or use VS Code's "Live Server" extension for auto-reload).
@@ -127,7 +128,7 @@ project-management-jpdb/
 ```
 Project-ID: P101
 Project-Name: Library Automation System
-Assigned-To: Prajakta Sarkhel
+Assigned-To: Prajakta Sharma
 Assignment-Date: 2026-06-01
 Deadline: 2026-07-15
 ```

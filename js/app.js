@@ -32,8 +32,10 @@ const statusMessage = document.getElementById("statusMessage");
 // Fields that are NOT the primary key (used for enabling/disabling + validation)
 const otherFields = [projectNameInput, assignedToInput, assignmentDateInput, deadlineInput];
 
-// Tracks whether the currently loaded Project ID already exists in the DB
+// Tracks whether the currently loaded Project ID already exists in the DB,
+// and its JPDB record number (needed for UPDATE requests).
 let recordExists = false;
+let currentRecNo = null;
 
 // ===========================================================
 // JPDB API HELPER FUNCTIONS
@@ -48,14 +50,19 @@ function jpdbUrl() {
 
 /**
  * GET_BY_KEY -> check if a Project ID already exists, and fetch its data.
- * Returns the record object if found, or null if not found.
+ * Returns { recNo, row } if found, or null if not found.
+ *
+ * JPDB's actual success shape is:
+ *   { "data": { "rec_no": 1, "record": { ...columns... } }, "message": "...", "status": 200 }
+ * and its "not found" shape is:
+ *   { "message": "...", "status": 400 }  (no "data" key, or status !== 200)
  */
 async function getProjectByKey(projectId) {
   const payload = {
     cmd: "GET_BY_KEY",
     token: JPDB_CONFIG.TOKEN,
     dbName: JPDB_CONFIG.DB_NAME,
-    relName: JPDB_CONFIG.REL_NAME,
+    rel: JPDB_CONFIG.REL_NAME, // NOTE: JPDB expects "rel", not "relName"
     jsonStr: { "Project-ID": projectId }
   };
 
@@ -65,18 +72,17 @@ async function getProjectByKey(projectId) {
     body: JSON.stringify(payload)
   });
 
-  // JPDB returns a 400-style status when key is not found - that's expected,
-  // not a real error, so we handle it gracefully below.
-  const data = await response.json().catch(() => null);
+  const result = await response.json().catch(() => null);
 
-  if (!data) return null;
-
-  // JPDB's "not found" responses usually carry an error/message field
-  if (data.error || data.errorCode || data.message === "No Records Found") {
+  // Not found / error: JPDB returns status 400 (or no "data" key) in this case.
+  if (!result || result.status !== 200 || !result.data || !result.data.record) {
     return null;
   }
 
-  return data;
+  return {
+    recNo: result.data.rec_no,
+    row: result.data.record
+  };
 }
 
 /**
@@ -87,7 +93,7 @@ async function insertProject(record) {
     cmd: "PUT",
     token: JPDB_CONFIG.TOKEN,
     dbName: JPDB_CONFIG.DB_NAME,
-    relName: JPDB_CONFIG.REL_NAME,
+    rel: JPDB_CONFIG.REL_NAME, // NOTE: JPDB expects "rel", not "relName"
     jsonStr: record
   };
 
@@ -101,15 +107,20 @@ async function insertProject(record) {
 }
 
 /**
- * UPDATE an existing record (Project ID stays the same, other fields change).
+ * UPDATE an existing record.
+ * JPDB's UPDATE command requires the record number as the jsonStr key,
+ * mapping to only the columns that changed (Project-ID is the primary
+ * key and is not part of the update payload).
  */
-async function updateProject(record) {
+async function updateProject(recNo, changedFields) {
   const payload = {
     cmd: "UPDATE",
     token: JPDB_CONFIG.TOKEN,
     dbName: JPDB_CONFIG.DB_NAME,
-    relName: JPDB_CONFIG.REL_NAME,
-    jsonStr: record
+    rel: JPDB_CONFIG.REL_NAME, // NOTE: JPDB expects "rel", not "relName"
+    jsonStr: {
+      [recNo]: changedFields
+    }
   };
 
   const response = await fetch(jpdbUrl(), {
@@ -141,6 +152,7 @@ function clearMessage() {
 function resetFormToStep2() {
   form.reset();
   recordExists = false;
+  currentRecNo = null;
 
   projectIdInput.disabled = false;
   otherFields.forEach((field) => (field.disabled = true));
@@ -154,15 +166,10 @@ function resetFormToStep2() {
 }
 
 /**
- * Fill the form fields with data coming back from JPDB.
- * JPDB wraps the actual row inside different keys depending on version,
- * so we normalize here: try the most common shapes.
+ * Fill the form fields with a clean record row (as returned by
+ * getProjectByKey's normalized "row" object).
  */
-function fillFormWithRecord(record) {
-  // Most JPDB GET_BY_KEY responses put the row directly in the response,
-  // sometimes nested under "data". We check both.
-  const row = record.data || record;
-
+function fillFormWithRecord(row) {
   projectNameInput.value = row["Project-Name"] || "";
   assignedToInput.value = row["Assigned-To"] || "";
   assignmentDateInput.value = row["Assignment-Date"] || "";
@@ -200,7 +207,8 @@ projectIdInput.addEventListener("blur", async () => {
     if (existing) {
       // ---- Record found: load it, switch to UPDATE mode ----
       recordExists = true;
-      fillFormWithRecord(existing);
+      currentRecNo = existing.recNo;
+      fillFormWithRecord(existing.row);
 
       projectIdInput.disabled = true; // primary key cannot change
       otherFields.forEach((field) => (field.disabled = false));
@@ -214,6 +222,7 @@ projectIdInput.addEventListener("blur", async () => {
     } else {
       // ---- Not found: switch to SAVE (new entry) mode ----
       recordExists = false;
+      currentRecNo = null;
 
       otherFields.forEach((field) => {
         field.disabled = false;
@@ -260,8 +269,8 @@ saveBtn.addEventListener("click", async () => {
     showMessage("Saving...", "info");
     const result = await insertProject(record);
 
-    if (result.error || result.errorCode) {
-      showMessage("Save failed: " + (result.message || result.error), "error");
+    if (result.status !== 200) {
+      showMessage("Save failed: " + (result.message || "Unknown error"), "error");
       return;
     }
 
@@ -280,8 +289,14 @@ saveBtn.addEventListener("click", async () => {
 updateBtn.addEventListener("click", async () => {
   if (!validateOtherFields()) return;
 
-  const record = {
-    "Project-ID": projectIdInput.value.trim(),
+  if (currentRecNo === null || currentRecNo === undefined) {
+    showMessage("Could not determine which record to update. Try re-entering the Project ID.", "error");
+    return;
+  }
+
+  // Only the non-key fields are sent - Project-ID is the primary key
+  // and is not included in an UPDATE's jsonStr.
+  const changedFields = {
     "Project-Name": projectNameInput.value.trim(),
     "Assigned-To": assignedToInput.value.trim(),
     "Assignment-Date": assignmentDateInput.value,
@@ -290,10 +305,10 @@ updateBtn.addEventListener("click", async () => {
 
   try {
     showMessage("Updating...", "info");
-    const result = await updateProject(record);
+    const result = await updateProject(currentRecNo, changedFields);
 
-    if (result.error || result.errorCode) {
-      showMessage("Update failed: " + (result.message || result.error), "error");
+    if (result.status !== 200) {
+      showMessage("Update failed: " + (result.message || "Unknown error"), "error");
       return;
     }
 
